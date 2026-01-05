@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr  # type: ignore
+from pydantic import BaseModel, ConfigDict, EmailStr  # type: ignore
 
 
 class Message(BaseModel):
@@ -12,9 +12,10 @@ class UserSchema(BaseModel):
 
 
 class UserPublic(BaseModel):
+    id: int
     username: str
     email: EmailStr
-    id: int
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserDB(UserSchema):
