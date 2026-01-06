@@ -83,7 +83,7 @@ def token(client, user):
     response = client.post(
         '/token',
         data={
-            'username': user.username,
+            'username': user.email,
             'password': user.clean_password,
         },
     )

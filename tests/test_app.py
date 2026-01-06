@@ -63,9 +63,12 @@ def test_create_user_username_duplicado(client, user):
 
 # READ USERS TESTS
 # test read users deve retornar lista de usuarios
-def test_read_users_deve_retornar_lista_de_usuarios(client, user):
+def test_read_users_deve_retornar_lista_de_usuarios(client, user, token):
     user_schema = UserPublic.model_validate(user).model_dump()
-    response = client.get('/users')
+    response = client.get(
+        '/users',
+        headers={'Authorization': f'Bearer {token}'},
+    )
     assert response.status_code == HTTPStatus.OK
     assert response.json() == {'users': [user_schema]}
 
@@ -174,7 +177,7 @@ def test_get_token_sucesso(client, user):
     response = client.post(
         '/token',
         data={
-            'username': user.username,
+            'username': user.email,
             'password': user.clean_password,
         },
     )
@@ -190,7 +193,7 @@ def test_get_token_sucesso(client, user):
 def test_get_token_credenciais_invalidas(client, user):
     response = client.post(
         '/token',
-        data={'username': user.email, 'password': user.clean_password},
+        data={'username': user.username, 'password': user.clean_password},
     )
     body = response.json()
 

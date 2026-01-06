@@ -37,9 +37,7 @@ def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
     session: Session = Depends(get_session),
 ):
-    user = session.scalar(
-        select(User).where(User.username == form_data.username)
-    )
+    user = session.scalar(select(User).where(User.email == form_data.username))
     if not user:
         raise HTTPException(
             status_code=HTTPStatus.UNAUTHORIZED,
@@ -93,7 +91,10 @@ def create_user(user: UserSchema, session: Session = Depends(get_session)):
 
 @app.get('/users/', response_model=UserList)
 def read_users(
-    skip: int = 0, limit: int = 100, session: Session = Depends(get_session)
+    skip: int = 0,
+    limit: int = 100,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ):
     users = session.scalars(select(User).offset(skip).limit(limit)).all()
     return {'users': users}
