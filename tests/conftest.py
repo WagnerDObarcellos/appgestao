@@ -16,10 +16,14 @@ from app_gestao.security import get_password_hash
 @pytest.fixture
 def client(session):
     def get_session_override():
-        return session
+        yield session
+
+    def get_current_user_override():
+        return user
+
+    app.dependency_overrides[get_session] = get_session_override
 
     with TestClient(app) as client:
-        app.dependency_overrides[get_session] = get_session_override
         yield client
 
     app.dependency_overrides.clear()
@@ -81,10 +85,10 @@ def mock_db_time():
 @pytest.fixture
 def token(client, user):
     response = client.post(
-        '/token',
+        '/auth/token',
         data={
             'username': user.email,
             'password': user.clean_password,
         },
     )
-    return response.json()['acess_token']
+    return response.json()['access_token']

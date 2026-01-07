@@ -1,9 +1,11 @@
 from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
+from typing import Annotated
 
 from fastapi import Depends, HTTPException  # type: ignore
 from fastapi.security import OAuth2PasswordBearer  # type: ignore
-from jwt import PyJWTError, decode, encode  # type: ignore
+from jose import JWTError, jwt  # type: ignore
+from jwt import encode  # type: ignore
 from pwdlib import PasswordHash  # type: ignore
 from sqlalchemy import select  # type: ignore
 from sqlalchemy.orm import Session  # type: ignore
@@ -47,26 +49,34 @@ def verify_password(password: str, hashed_password: str) -> bool:
         return False
 
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl='token')
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl='auth/token'  # ajuste conforme sua rota
+)
 
 
 def get_current_user(
-    token: str = Depends(oauth2_scheme), db: Session = Depends(get_session)
+    token: Annotated[str, Depends(oauth2_scheme)],
+    db: Session = Depends(get_session),
 ) -> User:
     credentials_exception = HTTPException(
         status_code=HTTPStatus.UNAUTHORIZED,
-        detail='Could not validate credentials',
+        detail='Not authenticated',
         headers={'WWW-Authenticate': 'Bearer'},
     )
-    try:
-        payload = decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get('sub')
-        if username is None:
-            raise credentials_exception
-    except PyJWTError:
+
+    # Se o token vier vazio, force a interrupção
+    if not token:
         raise credentials_exception
 
-    stmt = select(User).where(User.username == username)
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str | None = payload.get('sub')
+        if email is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+
+    stmt = select(User).where(User.email == email)
     user = db.execute(stmt).scalars().first()
     if user is None:
         raise credentials_exception

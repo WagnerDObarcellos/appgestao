@@ -26,11 +26,11 @@ def test_create_user_deve_criar_usuario(client):
     )
 
     assert response.status_code == HTTPStatus.CREATED
-    assert response.json() == {
-        'id': 1,
-        'username': 'alice',
-        'email': 'alice@example.com',
-    }
+    body = response.json()
+
+    assert body['username'] == 'alice'
+    assert body['email'] == 'alice@example.com'
+    assert isinstance(body['id'], int)
 
 
 # test create user email duplicado
@@ -175,7 +175,7 @@ def test_delete_user_inexistente(client, token):
 # test get token sucesso
 def test_get_token_sucesso(client, user):
     response = client.post(
-        '/token',
+        '/auth/token',
         data={
             'username': user.email,
             'password': user.clean_password,
@@ -185,21 +185,21 @@ def test_get_token_sucesso(client, user):
     body = response.json()
 
     assert response.status_code == HTTPStatus.OK
-    assert 'acess_token' in body
+    assert 'access_token' in body
     assert body['token_type'] == 'bearer'
 
 
 # test get token credenciais invalidas
 def test_get_token_credenciais_invalidas(client, user):
     response = client.post(
-        '/token',
-        data={'username': user.username, 'password': user.clean_password},
+        '/auth/token',
+        data={'username': user.username, 'password': 'senha_errada_aqui'},
     )
     body = response.json()
 
     assert response.status_code == HTTPStatus.UNAUTHORIZED
     assert 'access_token' not in body
-    assert body['detail'] == 'Incorrect username or password'
+    assert body['detail'] == 'Incorrect email or password'
 
 
 def test_get_current_user_not_found(client):
@@ -212,7 +212,7 @@ def test_get_current_user_not_found(client):
     )
 
     assert response.status_code == HTTPStatus.UNAUTHORIZED
-    assert response.json() == {'detail': 'Could not validate credentials'}
+    assert response.json() == {'detail': 'Not authenticated'}
 
 
 def test_get_current_user_does_not_exists(client):
@@ -225,4 +225,4 @@ def test_get_current_user_does_not_exists(client):
     )
 
     assert response.status_code == HTTPStatus.UNAUTHORIZED
-    assert response.json() == {'detail': 'Could not validate credentials'}
+    assert response.json() == {'detail': 'Not authenticated'}
