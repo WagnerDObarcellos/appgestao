@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session  # type: ignore
 
 from app_gestao.database import get_session
 from app_gestao.models import User
-from app_gestao.schemas import UserList, UserPublic, UserSchema
+from app_gestao.schemas import FilterPage, UserList, UserPublic, UserSchema
 from app_gestao.security import get_current_user, get_password_hash
 
 SessionDep: TypeAlias = Annotated[Session, Depends(get_session)]
@@ -56,12 +56,13 @@ def create_user(
 
 @router.get('/', response_model=UserList)
 def read_users(
+    params: Annotated[FilterPage, Depends()],
     session: SessionDep,  # type: ignore
     current_user: Annotated[User, Depends(get_current_user)],
-    skip: int = 0,
-    limit: int = 100,
 ):
-    users = session.scalars(select(User).offset(skip).limit(limit)).all()
+    users = session.scalars(
+        select(User).offset(params.skip).limit(params.limit)
+    ).all()
     return {'users': users}
 
 

@@ -1,7 +1,15 @@
 from http import HTTPStatus
+from unittest.mock import patch
+
+import pytest  # type: ignore
+from fastapi import HTTPException  # type: ignore
 
 from app_gestao.schemas import UserPublic
-from app_gestao.security import create_access_token
+from app_gestao.security import (
+    create_access_token,
+    get_current_user,
+    verify_password,
+)
 
 
 def test_root_deve_retornar_ola_mundo(client):
@@ -71,6 +79,22 @@ def test_read_users_deve_retornar_lista_de_usuarios(client, user, token):
     )
     assert response.status_code == HTTPStatus.OK
     assert response.json() == {'users': [user_schema]}
+
+
+# test read users com query params
+def test_read_users_with_query_params(client, token, user):
+    response = client.get(
+        '/users?skip=0&limit=1',
+        headers={'Authorization': f'Bearer {token}'},
+    )
+
+    assert response.status_code == HTTPStatus.OK
+
+    data = response.json()
+
+    assert 'users' in data
+    assert isinstance(data['users'], list)
+    assert len(data['users']) <= 1
 
 
 # UPDATE USER TESTS
@@ -150,6 +174,21 @@ def test_update_user_sem_token(client, user):
     assert response.json() == {'detail': 'Not authenticated'}
 
 
+def test_update_user_forbidden(client, other_user, token):
+    # Testa erro 403 ao tentar atualizar outro usuário.
+    response = client.put(
+        f'/users/{other_user.id}',
+        headers={'Authorization': f'Bearer {token}'},
+        json={
+            'username': 'novo_nome',
+            'email': 'novo_email@example.com',
+            'password': 'nova_senha',
+        },
+    )
+    assert response.status_code == HTTPStatus.FORBIDDEN
+    assert response.json() == {'detail': 'Not enough permissions'}
+
+
 # DELETE USER TESTS
 # test delete user sucesso
 def test_delete_user(client, user, token):
@@ -169,6 +208,17 @@ def test_delete_user_inexistente(client, token):
     )
     assert response.status_code == HTTPStatus.NOT_FOUND
     assert response.json() == {'detail': 'User not found'}
+
+
+# test delete user forbidden
+def test_delete_user_forbidden(client, other_user, token):
+    """Testa erro 403 ao tentar deletar outro usuário."""
+    response = client.delete(
+        f'/users/{other_user.id}',
+        headers={'Authorization': f'Bearer {token}'},
+    )
+    assert response.status_code == HTTPStatus.FORBIDDEN
+    assert response.json() == {'detail': 'Not enough permissions'}
 
 
 # TOKEN TESTS
@@ -226,3 +276,53 @@ def test_get_current_user_does_not_exists(client):
 
     assert response.status_code == HTTPStatus.UNAUTHORIZED
     assert response.json() == {'detail': 'Not authenticated'}
+
+
+def test_get_current_user_token_vazio(session):
+    with pytest.raises(HTTPException) as exc:
+        get_current_user(token='', db=session)
+
+    assert exc.value.status_code == HTTPStatus.UNAUTHORIZED
+    assert exc.value.detail == 'Not authenticated'
+
+
+def test_not_verify_password(client, user):
+    response = client.post(
+        '/auth/token',
+        data={'username': user.email, 'password': 'wrong_password'},
+    )
+
+    assert response.status_code == HTTPStatus.UNAUTHORIZED
+    assert response.json() == {'detail': 'Incorrect email or password'}
+
+
+def test_verify_password_exception():
+    with patch(
+        'app_gestao.security.pwd_context.verify',
+        side_effect=Exception('Erro interno'),
+    ):
+        result = verify_password('senha', 'hash_invalido')
+
+    assert result is False
+
+
+def test_login_token_verify_password_exception(client, user):
+    """
+    Se verify_password lançar exceção,
+    a rota deve responder 401 e não quebrar a aplicação.
+    """
+
+    with patch(
+        'app_gestao.routers.auth.verify_password',
+        side_effect=Exception('Erro interno'),
+    ):
+        response = client.post(
+            '/auth/token',
+            data={
+                'username': user.email,
+                'password': 'senha_errada',
+            },
+        )
+
+    assert response.status_code == HTTPStatus.UNAUTHORIZED
+    assert response.json()['detail'] == 'Incorrect email or password'

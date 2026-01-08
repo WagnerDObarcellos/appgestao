@@ -1,9 +1,27 @@
 from datetime import timedelta
 from http import HTTPStatus
 
+from jose import jwt  # type: ignore
 from jwt import decode  # type: ignore
 
 from app_gestao.security import SECRET_KEY, create_access_token
+from app_gestao.settings import Settings
+
+
+def create_access_token_com_expire_delta():
+    settings = Settings()
+
+    token = create_access_token(
+        data={'sub': 'test@test.com'},
+        expires_delta=timedelta(minutes=5),
+    )
+
+    payload = jwt.decode(
+        token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+    )
+
+    assert payload['sub'] == 'test@test.com'
+    assert 'exp' in payload
 
 
 def test_jwt():

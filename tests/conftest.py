@@ -11,6 +11,7 @@ from app_gestao.app import app
 from app_gestao.database import get_session
 from app_gestao.models import User, table_registry
 from app_gestao.security import get_password_hash
+from app_gestao.settings import Settings
 
 
 @pytest.fixture
@@ -92,3 +93,22 @@ def token(client, user):
         },
     )
     return response.json()['access_token']
+
+
+@pytest.fixture
+def other_user(session):
+    user = User(
+        username='Another',
+        email='another_email@example.com',
+        password=get_password_hash('anotherpassword'),
+    )
+
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+
+    return user
+
+@pytest.fixture
+def settings():
+    return Settings()

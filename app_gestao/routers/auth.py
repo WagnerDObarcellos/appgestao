@@ -27,7 +27,19 @@ def login_for_access_token(form_data: OAuth2Form, session: Session):  # type: ig
             detail='Incorrect email or password',
         )
 
-    if not verify_password(form_data.password, user.password):
+    # 🔐 AQUI entra o try/except
+    try:
+        password_valid = verify_password(
+            form_data.password,
+            user.password,
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=HTTPStatus.UNAUTHORIZED,
+            detail='Incorrect email or password',
+        )
+
+    if not password_valid:
         raise HTTPException(
             status_code=HTTPStatus.UNAUTHORIZED,
             detail='Incorrect email or password',
@@ -35,4 +47,7 @@ def login_for_access_token(form_data: OAuth2Form, session: Session):  # type: ig
 
     access_token = create_access_token(data={'sub': user.email})
 
-    return {'access_token': access_token, 'token_type': 'bearer'}
+    return {
+        'access_token': access_token,
+        'token_type': 'bearer',
+    }
