@@ -8,7 +8,7 @@ from jose import JWTError, jwt  # type: ignore
 from jwt import encode  # type: ignore
 from pwdlib import PasswordHash  # type: ignore
 from sqlalchemy import select  # type: ignore
-from sqlalchemy.orm import Session  # type: ignore
+from sqlalchemy.ext.asyncio import AsyncSession  # type: ignore
 
 from app_gestao.database import get_session
 from app_gestao.models import User
@@ -54,9 +54,9 @@ oauth2_scheme = OAuth2PasswordBearer(
 )
 
 
-def get_current_user(
+async def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)],
-    db: Session = Depends(get_session),
+    db: AsyncSession = Depends(get_session),
 ) -> User:
     credentials_exception = HTTPException(
         status_code=HTTPStatus.UNAUTHORIZED,
@@ -77,7 +77,8 @@ def get_current_user(
         raise credentials_exception
 
     stmt = select(User).where(User.email == email)
-    user = db.execute(stmt).scalars().first()
+    result = await db.execute(stmt)
+    user = result.scalars().first()
     if user is None:
         raise credentials_exception
     return user

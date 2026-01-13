@@ -252,6 +252,66 @@ def test_get_token_credenciais_invalidas(client, user):
     assert body['detail'] == 'Incorrect email or password'
 
 
+# teste quando o usuario não existe
+def test_get_token_usuario_nao_existe(client):
+    response = client.post(
+        '/auth/token',
+        data={
+            'username': 'naoexiste@email.com',
+            'password': 'qualquer_senha',
+        },
+    )
+
+    assert response.status_code == HTTPStatus.UNAUTHORIZED
+    assert response.json() == {'detail': 'Incorrect email or password'}
+
+
+# Teste de email inexistente
+def test_get_token_email_inexistente(client):
+    response = client.post(
+        '/auth/token',
+        data={
+            'username': 'naoexiste@test.com',
+            'password': 'qualquer-senha',
+        },
+    )
+    assert response.status_code == HTTPStatus.UNAUTHORIZED
+    assert response.json() == {'detail': 'Incorrect email or password'}
+
+
+# Teste get token senha incorreta
+def test_get_token_senha_incorreta(client, user):
+    response = client.post(
+        '/auth/token',
+        data={
+            'username': user.email,
+            'password': 'senha-errada',
+        },
+    )
+
+    assert response.status_code == HTTPStatus.UNAUTHORIZED
+    assert response.json() == {'detail': 'Incorrect email or password'}
+
+
+# Teste get toke passwod verify exception
+def test_get_token_password_verify_exception(client, user):
+    with patch('app_gestao.routers.auth.verify_password') as mock:
+        mock.side_effect = Exception('Erro interno de Hash')
+
+        response = client.post(
+            '/auth/token',
+            data={
+                'username': user.email,
+                'password': user.clean_password,
+            },
+        )
+
+        assert response.status_code == HTTPStatus.UNAUTHORIZED
+        assert response.json() == {'detail': 'Incorrect email or password'}
+
+
+# GET_CURRENT_USER_TOKEN
+# teste token não encontrado
 def test_get_current_user_not_found(client):
     data = {'no-email': 'test'}
     token = create_access_token(data)
@@ -278,9 +338,10 @@ def test_get_current_user_does_not_exists(client):
     assert response.json() == {'detail': 'Not authenticated'}
 
 
-def test_get_current_user_token_vazio(session):
+@pytest.mark.asyncio
+async def test_get_current_user_token_vazio(session):
     with pytest.raises(HTTPException) as exc:
-        get_current_user(token='', db=session)
+        await get_current_user(token='', db=session)
 
     assert exc.value.status_code == HTTPStatus.UNAUTHORIZED
     assert exc.value.detail == 'Not authenticated'

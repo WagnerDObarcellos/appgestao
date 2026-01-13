@@ -4,22 +4,25 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException  # type: ignore
 from fastapi.security import OAuth2PasswordRequestForm  # type: ignore
 from sqlalchemy import select  # type: ignore
-from sqlalchemy.orm import Session  # type: ignore
+from sqlalchemy.ext.asyncio import AsyncSession  # type: ignore
 
 from app_gestao.database import get_session
 from app_gestao.models import User
 from app_gestao.schemas import Token
 from app_gestao.security import create_access_token, verify_password
 
-router = APIRouter(prefix='/auth', tags=['auth'])
+router = APIRouter(prefix='/auth', tags=['auth'])  # pragma: no cover
 
 OAuth2Form = Annotated[OAuth2PasswordRequestForm, Depends()]
-Session = Annotated[Session, Depends(get_session)]
+# pragma: no cover
+SessionDep = Annotated[AsyncSession, Depends(get_session)]  # pragma: no cover
 
 
 @router.post('/token', response_model=Token)
-def login_for_access_token(form_data: OAuth2Form, session: Session):  # type: ignore
-    user = session.scalar(select(User).where(User.email == form_data.username))
+async def login_for_access_token(form_data: OAuth2Form, session: SessionDep):  # type: ignore
+    user = await session.scalar(
+        select(User).where(User.email == form_data.username)
+    )
 
     if not user:
         raise HTTPException(

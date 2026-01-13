@@ -1,10 +1,15 @@
 from contextlib import contextmanager
 from datetime import datetime
+from http import HTTPStatus
+from types import SimpleNamespace
 
-import pytest  # type: ignore
+import pytest_asyncio  # type: ignore
 from fastapi.testclient import TestClient  # type: ignore
-from sqlalchemy import create_engine, event  # type: ignore
-from sqlalchemy.orm import Session  # type: ignore
+from sqlalchemy import event  # type: ignore
+from sqlalchemy.ext.asyncio import (  # type: ignore
+    AsyncSession,
+    create_async_engine,
+)
 from sqlalchemy.pool import StaticPool  # type: ignore
 
 from app_gestao.app import app
@@ -14,13 +19,10 @@ from app_gestao.security import get_password_hash
 from app_gestao.settings import Settings
 
 
-@pytest.fixture
-def client(session):
-    def get_session_override():
+@pytest_asyncio.fixture
+async def client(session):
+    async def get_session_override():
         yield session
-
-    def get_current_user_override():
-        return user
 
     app.dependency_overrides[get_session] = get_session_override
 
@@ -30,37 +32,40 @@ def client(session):
     app.dependency_overrides.clear()
 
 
-@pytest.fixture
-def session():
-    engine = create_engine(
-        'sqlite:///:memory:',
+@pytest_asyncio.fixture
+async def session():
+    engine = create_async_engine(
+        'sqlite+aiosqlite:///:memory:',
         connect_args={'check_same_thread': False},
         poolclass=StaticPool,
     )
-    table_registry.metadata.create_all(engine)
+    async with engine.begin() as conn:
+        await conn.run_sync(table_registry.metadata.create_all)
 
-    with Session(engine) as session:
+    async with AsyncSession(engine, expire_on_commit=False) as session:
         yield session
 
-    table_registry.metadata.drop_all(engine)
-    engine.dispose()
+    async with engine.begin() as conn:
+        await conn.run_sync(table_registry.metadata.drop_all)
 
 
-@pytest.fixture
-def user(session):
-    password = 'testtest'
-    user = User(
-        username='Teste',
-        email='teste@test.com',
-        password=get_password_hash(password),
-    )
-    session.add(user)
-    session.commit()
-    session.refresh(user)
+@pytest_asyncio.fixture
+async def user(client):
+    payload = {
+        'username': 'teste',
+        'email': 'teste@test.com',
+        'password': 'testtest',
+    }
 
-    user.clean_password = password
+    response = client.post('/users/', json=payload)
 
-    return user
+    server_user = response.json()
+
+    assert response.status_code == HTTPStatus.CREATED, server_user
+
+    server_user['clean_password'] = 'testtest'
+
+    return SimpleNamespace(**server_user)
 
 
 @contextmanager
@@ -78,13 +83,13 @@ def _mock_db_time(*, model, time=datetime(2024, 1, 1)):
     event.remove(model, 'before_insert', fake_time_hook)
 
 
-@pytest.fixture
-def mock_db_time():
+@pytest_asyncio.fixture
+async def mock_db_time():
     return _mock_db_time
 
 
-@pytest.fixture
-def token(client, user):
+@pytest_asyncio.fixture
+async def token(client, user):
     response = client.post(
         '/auth/token',
         data={
@@ -92,11 +97,14 @@ def token(client, user):
             'password': user.clean_password,
         },
     )
+
+    assert response.status_code == HTTPStatus.OK, response.json()
+
     return response.json()['access_token']
 
 
-@pytest.fixture
-def other_user(session):
+@pytest_asyncio.fixture
+async def other_user(session):
     user = User(
         username='Another',
         email='another_email@example.com',
@@ -104,11 +112,12 @@ def other_user(session):
     )
 
     session.add(user)
-    session.commit()
-    session.refresh(user)
+    await session.commit()
+    await session.refresh(user)
 
     return user
 
-@pytest.fixture
-def settings():
+
+@pytest_asyncio.fixture
+async def settings():
     return Settings()
