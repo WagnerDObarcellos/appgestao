@@ -3,6 +3,7 @@ from datetime import datetime
 from http import HTTPStatus
 from types import SimpleNamespace
 
+import factory  # type: ignore
 import pytest_asyncio  # type: ignore
 from fastapi.testclient import TestClient  # type: ignore
 from sqlalchemy import event  # type: ignore
@@ -50,7 +51,20 @@ async def session():
 
 
 @pytest_asyncio.fixture
-async def user(client):
+async def user(session):
+    password = 'testtest'
+    user = UserFactory(password=get_password_hash(password))
+
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+
+    user.clean_password = password
+    return user
+
+
+@pytest_asyncio.fixture
+async def user_via_api(client):
     payload = {
         'username': 'teste',
         'email': 'teste@test.com',
@@ -105,7 +119,7 @@ async def token(client, user):
 
 @pytest_asyncio.fixture
 async def other_user(session):
-    user = User(
+    user = UserFactory(
         username='Another',
         email='another_email@example.com',
         password=get_password_hash('anotherpassword'),
@@ -121,3 +135,12 @@ async def other_user(session):
 @pytest_asyncio.fixture
 async def settings():
     return Settings()
+
+
+class UserFactory(factory.Factory):
+    class Meta:
+        model = User
+
+    username = factory.Sequence(lambda n: f'test{n}')
+    email = factory.LazyAttribute(lambda obj: f'{obj.username}@test.com')
+    password = factory.LazyAttribute(lambda obj: f'{obj.username}@example.com')

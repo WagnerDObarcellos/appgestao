@@ -89,9 +89,9 @@ async def update_user(
         )
 
     try:
-        current_user.username = user.username
-        current_user.email = user.email
-        current_user.password = get_password_hash(user.password)
+        db_user.username = user.username
+        db_user.email = user.email
+        db_user.password = get_password_hash(user.password)
         await session.commit()
         await session.refresh(db_user)
 
@@ -111,7 +111,7 @@ async def delete_user(
     session: SessionDep,  # type: ignore
     current_user: Annotated[User, Depends(get_current_user)],
 ):
-    db_user = await session.scalar(select(User).where(User.id == user_id))
+    db_user = await session.get(User, user_id)
 
     if not db_user:
         raise HTTPException(
@@ -125,7 +125,5 @@ async def delete_user(
             detail='Not enough permissions',
         )
 
-    session.delete(db_user)
-    session.commit()
-
-    return {'message': 'User deleted'}
+    await session.delete(db_user)
+    await session.commit()

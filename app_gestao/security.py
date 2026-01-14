@@ -50,7 +50,7 @@ def verify_password(password: str, hashed_password: str) -> bool:
 
 
 oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl='auth/token'  # ajuste conforme sua rota
+    tokenUrl='auth/token', refreshUrl='auth/refresh'
 )
 
 
@@ -73,6 +73,9 @@ async def get_current_user(
         email: str | None = payload.get('sub')
         if email is None:
             raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+
     except JWTError:
         raise credentials_exception
 

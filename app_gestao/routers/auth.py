@@ -9,13 +9,18 @@ from sqlalchemy.ext.asyncio import AsyncSession  # type: ignore
 from app_gestao.database import get_session
 from app_gestao.models import User
 from app_gestao.schemas import Token
-from app_gestao.security import create_access_token, verify_password
+from app_gestao.security import (
+    create_access_token,
+    get_current_user,
+    verify_password,
+)
 
 router = APIRouter(prefix='/auth', tags=['auth'])  # pragma: no cover
 
 OAuth2Form = Annotated[OAuth2PasswordRequestForm, Depends()]
 # pragma: no cover
 SessionDep = Annotated[AsyncSession, Depends(get_session)]  # pragma: no cover
+CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
 @router.post('/token', response_model=Token)
@@ -54,3 +59,10 @@ async def login_for_access_token(form_data: OAuth2Form, session: SessionDep):  #
         'access_token': access_token,
         'token_type': 'bearer',
     }
+
+
+@router.post('/refresh_token', response_model=Token)
+async def refresh_access_token(user: CurrentUser):
+    new_access_token = create_access_token(data={'sub': user.email})
+
+    return {'access_token': new_access_token, 'token_type': 'bearer'}
