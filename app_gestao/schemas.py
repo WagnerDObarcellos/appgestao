@@ -1,4 +1,6 @@
-from pydantic import BaseModel, ConfigDict, EmailStr  # type: ignore
+from pydantic import BaseModel, ConfigDict, EmailStr, Field  # type: ignore
+
+from app_gestao.models import TodoState
 
 
 class Message(BaseModel):
@@ -34,3 +36,29 @@ class Token(BaseModel):
 class FilterPage(BaseModel):
     skip: int = 0
     limit: int = 100
+
+
+class TodoSchema(BaseModel):
+    title: str
+    description: str
+    state: TodoState
+
+
+class TodoPublic(TodoSchema):
+    id: int
+
+
+class TodoList(BaseModel):
+    todos: list[TodoPublic]
+
+
+class FilterTodo(FilterPage):
+    title: str | None = Field(None, min_length=3, max_length=20)
+    description: str | None = Field(None, min_length=3, max_length=20)
+    state: TodoState | None = None
+
+
+class TodoUpdate(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    state: TodoState | None = None
