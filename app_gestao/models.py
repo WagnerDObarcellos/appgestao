@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import ForeignKey, func  # type: ignore
+from sqlalchemy import ForeignKey, String, func  # type: ignore
 from sqlalchemy.orm import (  # type: ignore
     Mapped,
     mapped_as_dataclass,
@@ -29,6 +29,20 @@ class User:
     username: Mapped[str] = mapped_column(unique=True)
     password: Mapped[str]
     email: Mapped[str] = mapped_column(unique=True)
+    todos: Mapped[list['Todo']] = relationship(
+        back_populates='user',
+        cascade='all, delete-orphan',
+        lazy='selectin',
+        init=False,
+        repr=False,
+        compare=False,
+        default_factory=list,
+    )
+    role: Mapped[str] = mapped_column(
+        String(20),
+        default='user',
+        nullable=False,
+    )
     created_at: Mapped[datetime] = mapped_column(
         init=False, server_default=func.now()
     )
@@ -36,12 +50,6 @@ class User:
         init=False,
         server_default=func.now(),
         onupdate=func.now(),
-    )
-
-    todos: Mapped[list['Todo']] = relationship(
-        init=False,
-        cascade='all, delete-orphan',
-        lazy='selectin',
     )
 
 
@@ -55,3 +63,9 @@ class Todo:
     state: Mapped[TodoState]
 
     user_id: Mapped[int] = mapped_column(ForeignKey('users.id'))
+    user: Mapped['User'] = relationship(
+        back_populates='todos',
+        init=False,
+        repr=False,
+        compare=False,
+    )

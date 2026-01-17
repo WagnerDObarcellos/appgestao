@@ -3,6 +3,10 @@ FROM python:3.11-slim
 ENV POETRY_VIRTUALENVS_CREATE=false
 WORKDIR /app
 
+RUN apt-get update \
+    && apt-get install -y sqlite3 \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN pip install poetry
 
 COPY pyproject.toml poetry.lock* ./

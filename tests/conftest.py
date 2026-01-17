@@ -19,6 +19,8 @@ from app_gestao.models import User, table_registry
 from app_gestao.security import get_password_hash
 from app_gestao.settings import Settings
 
+TEST_DATABASE_URL = 'sqlite+aiosqlite:///./test.db'
+
 
 @pytest_asyncio.fixture
 async def client(session):
@@ -144,3 +146,20 @@ class UserFactory(factory.Factory):
     username = factory.Sequence(lambda n: f'test{n}')
     email = factory.LazyAttribute(lambda obj: f'{obj.username}@test.com')
     password = factory.LazyAttribute(lambda obj: f'{obj.username}@example.com')
+
+
+@pytest_asyncio.fixture
+async def admin_user(session, user):
+    user.role = 'admin'
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+
+    return user
+
+
+@pytest_asyncio.fixture
+async def async_engine():
+    engine = create_async_engine(TEST_DATABASE_URL)
+    yield engine
+    await engine.dispose()

@@ -35,7 +35,6 @@ async def login_for_access_token(form_data: OAuth2Form, session: SessionDep):  #
             detail='Incorrect email or password',
         )
 
-    # 🔐 AQUI entra o try/except
     try:
         password_valid = verify_password(
             form_data.password,

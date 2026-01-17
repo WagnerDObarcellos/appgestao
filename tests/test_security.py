@@ -1,12 +1,14 @@
 from datetime import timedelta
 from http import HTTPStatus
+from typing import Annotated
 from unittest.mock import patch
 
 import pytest  # type: ignore
-from fastapi import HTTPException  # type: ignore
+from fastapi import Depends, HTTPException  # type: ignore
 from jose import jwt  # type: ignore
 from jwt import decode  # type: ignore
 
+from app_gestao.models import User
 from app_gestao.security import (
     ALGORITHM,
     SECRET_KEY,
@@ -15,6 +17,8 @@ from app_gestao.security import (
     verify_password,
 )
 from app_gestao.settings import Settings
+
+CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
 def create_access_token_com_expire_delta():
@@ -67,6 +71,17 @@ async def test_get_current_user_sucesso(session, user):
 
     assert returned_user.email == user.email
     assert returned_user.id == user.id
+
+
+def get_current_admin_user(
+    current_user: CurrentUser,
+):
+    if current_user.role != 'admin':
+        raise HTTPException(
+            status_code=HTTPStatus.FORBIDDEN,
+            detail='Not enough permissions',
+        )
+    return current_user
 
 
 @pytest.mark.asyncio
@@ -152,3 +167,23 @@ def test_get_current_user_does_not_exists(client):
 
     assert response.status_code == HTTPStatus.UNAUTHORIZED
     assert response.json() == {'detail': 'Not authenticated'}
+
+
+@pytest.mark.asyncio
+async def test_get_current_admin_user_forbidden(user):
+    # Testa a negação (403) para usuário comum
+    user.role = 'user'
+    with pytest.raises(HTTPException) as exc:
+        await get_current_admin_user(current_user=user)
+
+    assert exc.value.status_code == HTTPStatus.FORBIDDEN
+    # Ajuste a mensagem abaixo:
+    assert exc.value.detail == 'Not enough permissions'
+
+
+@pytest.mark.asyncio
+async def test_get_current_admin_user_success(user):
+    # Testa o retorno de sucesso para admin
+    user.role = 'admin'
+    result = get_current_admin_user(current_user=user)
+    assert result.role == 'admin'

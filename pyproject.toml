@@ -50,7 +50,8 @@ quote-style = 'single'
 pythonpath = "."
 addopts = '-p no:warnings'
 asyncio_default_fixture_loop_scope = 'function'
-asyncio_mode = 'strict'
+asyncio_mode = 'auto'
+
 
 [tool.taskipy.tasks]
 lint = 'ruff check'
@@ -58,7 +59,7 @@ pre_format = 'ruff check --fix'
 format = 'ruff format'
 run = 'fastapi dev app_gestao/app.py'
 pre_test = 'task lint'
-test = 'pytest -s -x --cov=app_gestao -vv'
+test = 'pytest -s -x --cov=app_gestao --maxfail=1 -s --asyncio-mode=auto -vv'
 post_test = 'coverage html'
 
 [tool.coverage.run]

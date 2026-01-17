@@ -22,6 +22,7 @@ async def test_create_user(session, mock_db_time):
         'username': 'test',
         'email': 'test@example.com',
         'password': 'secret',
+        'role': 'user',
         'created_at': time,
         'updated_at': time,
         'todos': [],
@@ -42,13 +43,10 @@ async def test_create_todo(session, user):
 
     todo = await session.scalar(select(Todo))
 
-    assert asdict(todo) == {
-        'description': 'Test Desc',
-        'id': 1,
-        'state': 'draft',
-        'title': 'Test Todo',
-        'user_id': 1,
-    }
+    assert todo.title == 'Test Todo'
+    assert todo.description == 'Test Desc'
+    assert todo.state == 'draft'
+    assert todo.user_id == user.id
 
 
 @pytest.mark.asyncio

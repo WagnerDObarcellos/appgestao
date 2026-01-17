@@ -1,8 +1,10 @@
 #!/bin/sh
-set -e
+
+echo "📁 Creating database directory..."
+mkdir -p /app/data
 
 echo "🔄 Running migrations..."
 alembic upgrade head
 
-echo "🚀 Starting FastAPI..."
-uvicorn app_gestao.app:app --host 0.0.0.0 --port 8000
+echo "🚀 Starting API..."
+uvicorn app_gestao.main:app --host 0.0.0.0 --port 8000
