@@ -1,40 +1,46 @@
 from http import HTTPStatus
 from unittest.mock import patch
 
+import pytest  # type: ignore
 from freezegun import freeze_time  # type: ignore
 
 
-# Testando a expirção do token
-def test_token_expired_after_time(client, user):
-    with freeze_time('2023-01-14 12:00:00'):
-        response = client.post(
+@pytest.mark.asyncio
+async def test_token_expired_after_time(client, user):
+
+    with freeze_time('2026-01-20 12:00:00'):
+        response = await client.post(
             '/auth/token',
             data={
                 'username': user.email,
                 'password': user.clean_password,
             },
         )
+        # Se falhar aqui, verifique se a fixture user deu session.commit()
         assert response.status_code == HTTPStatus.OK
         token = response.json()['access_token']
 
-    with freeze_time('2023-01-14 12:31:00'):
-        response = client.put(
+    # 3. Avançamos o tempo para invalidar o token gerado acima.
+    with freeze_time('2026-01-20 12:31:00'):
+        response = await client.put(
             f'/users/{user.id}',
             headers={'Authorization': f'Bearer {token}'},
             json={
-                'username': 'wrongwrong',
-                'email': 'wrong@wrong.com',
-                'password': 'wrong',
+                'username': 'newname',
+                'email': 'new@email.com',
+                'password': 'newpassword',
             },
         )
         assert response.status_code == HTTPStatus.UNAUTHORIZED
-        assert response.json() == {'detail': 'Not authenticated'}
+        # Verifique se o detail é exatamente este:
+        assert response.json()['detail'] == 'Not authenticated'
 
 
 # TOKEN TESTS
 # test get token sucesso
-def test_get_token_sucesso(client, user):
-    response = client.post(
+@pytest.mark.asyncio
+async def test_get_token_sucesso(client, user):
+    response = await client.post(
         '/auth/token',
         data={
             'username': user.email,
@@ -50,8 +56,9 @@ def test_get_token_sucesso(client, user):
 
 
 # test get token credenciais invalidas
-def test_get_token_credenciais_invalidas(client, user):
-    response = client.post(
+@pytest.mark.asyncio
+async def test_get_token_credenciais_invalidas(client, user):
+    response = await client.post(
         '/auth/token',
         data={'username': user.username, 'password': 'senha_errada_aqui'},
     )
@@ -63,11 +70,12 @@ def test_get_token_credenciais_invalidas(client, user):
 
 
 # Teste get toke passwod verify exception
-def test_get_token_password_verify_exception(client, user):
+@pytest.mark.asyncio
+async def test_get_token_password_verify_exception(client, user):
     with patch('app_gestao.routers.auth.verify_password') as mock:
         mock.side_effect = Exception('Erro interno de Hash')
 
-        response = client.post(
+        response = await client.post(
             '/auth/token',
             data={
                 'username': user.email,
@@ -80,8 +88,9 @@ def test_get_token_password_verify_exception(client, user):
 
 
 # teste quando o usuario não existe
-def test_get_token_usuario_nao_existe(client):
-    response = client.post(
+@pytest.mark.asyncio
+async def test_get_token_usuario_nao_existe(client):
+    response = await client.post(
         '/auth/token',
         data={
             'username': 'naoexiste@email.com',
@@ -94,8 +103,9 @@ def test_get_token_usuario_nao_existe(client):
 
 
 # Teste de email inexistente
-def test_get_token_email_inexistente(client):
-    response = client.post(
+@pytest.mark.asyncio
+async def test_get_token_email_inexistente(client):
+    response = await client.post(
         '/auth/token',
         data={
             'username': 'naoexiste@test.com',
@@ -107,8 +117,9 @@ def test_get_token_email_inexistente(client):
 
 
 # Teste get token senha incorreta
-def test_get_token_senha_incorreta(client, user):
-    response = client.post(
+@pytest.mark.asyncio
+async def test_get_token_senha_incorreta(client, user):
+    response = await client.post(
         '/auth/token',
         data={
             'username': user.email,
@@ -120,17 +131,14 @@ def test_get_token_senha_incorreta(client, user):
     assert response.json() == {'detail': 'Incorrect email or password'}
 
 
-def test_login_token_verify_password_exception(client, user):
-    """
-    Se verify_password lançar exceção,
-    a rota deve responder 401 e não quebrar a aplicação.
-    """
+@pytest.mark.asyncio
+async def test_login_token_verify_password_exception(client, user):
 
     with patch(
         'app_gestao.routers.auth.verify_password',
         side_effect=Exception('Erro interno'),
     ):
-        response = client.post(
+        response = await client.post(
             '/auth/token',
             data={
                 'username': user.email,
@@ -142,8 +150,9 @@ def test_login_token_verify_password_exception(client, user):
     assert response.json()['detail'] == 'Incorrect email or password'
 
 
-def test_not_verify_password(client, user):
-    response = client.post(
+@pytest.mark.asyncio
+async def test_not_verify_password(client, user):
+    response = await client.post(
         '/auth/token',
         data={'username': user.email, 'password': 'wrong_password'},
     )
@@ -152,8 +161,9 @@ def test_not_verify_password(client, user):
     assert response.json() == {'detail': 'Incorrect email or password'}
 
 
-def test_refresh_token(client, user, token):
-    response = client.post(
+@pytest.mark.asyncio
+async def test_refresh_token(client, user, token):
+    response = await client.post(
         '/auth/refresh_token',
         headers={'Authorization': f'Bearer {token}'},
     )
@@ -166,9 +176,10 @@ def test_refresh_token(client, user, token):
     assert data['token_type'] == 'bearer'
 
 
-def test_token_expired_dont_refresh(client, user):
+@pytest.mark.asyncio
+async def test_token_expired_dont_refresh(client, user):
     with freeze_time('2023-01-14 12:00:00'):
-        response = client.post(
+        response = await client.post(
             '/auth/token',
             data={
                 'username': user.email,
@@ -179,7 +190,7 @@ def test_token_expired_dont_refresh(client, user):
         token = response.json()['access_token']
 
     with freeze_time('2023-01-14 12:31:00'):
-        response = client.post(
+        response = await client.post(
             '/auth/refresh_token',
             headers={'Authorization': f'Bearer {token}'},
         )

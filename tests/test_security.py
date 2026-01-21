@@ -54,8 +54,9 @@ def test_jwt_com_expiracao_customizada():
     assert isinstance(token, str)
 
 
-def test_jwt_invalid_token(client):
-    response = client.delete(
+@pytest.mark.asyncio
+async def test_jwt_invalid_token(client):
+    response = await client.delete(
         '/users/1', headers={'Authorization': 'Bearer token-invalido'}
     )
 
@@ -64,10 +65,13 @@ def test_jwt_invalid_token(client):
 
 
 @pytest.mark.asyncio
-async def test_get_current_user_sucesso(session, user):
-    # Testa o fluxo de sucesso: token válido e usuário existente
+async def test_get_current_user_sucesso(db_session, user):
+    user = await db_session.merge(user)
+
+    await db_session.commit()
+
     token = create_access_token(data={'sub': user.email})
-    returned_user = await get_current_user(token=token, db=session)
+    returned_user = await get_current_user(token=token, db=db_session)
 
     assert returned_user.email == user.email
     assert returned_user.id == user.id
@@ -85,47 +89,49 @@ def get_current_admin_user(
 
 
 @pytest.mark.asyncio
-async def test_get_current_user_token_vazio(session):
+async def test_get_current_user_token_vazio(db_session):
     # Testa o 'if not token'
     with pytest.raises(HTTPException) as exc:
-        await get_current_user(token='', db=session)
+        await get_current_user(token='', db=db_session)
 
     assert exc.value.status_code == HTTPStatus.UNAUTHORIZED
     assert exc.value.detail == 'Not authenticated'
 
 
 @pytest.mark.asyncio
-async def test_get_current_user_token_invalido(session):
+async def test_get_current_user_token_invalido(db_session):
     # Testa o bloco 'except JWTError'
     with pytest.raises(HTTPException) as exc:
-        await get_current_user(token='token-totalmente-invalido', db=session)
+        await get_current_user(
+            token='token-totalmente-invalido', db=db_session
+        )
 
     assert exc.value.status_code == HTTPStatus.UNAUTHORIZED
     assert exc.value.detail == 'Not authenticated'
 
 
 @pytest.mark.asyncio
-async def test_get_current_user_payload_sem_email(session):
+async def test_get_current_user_payload_sem_email(db_session):
     # Testa um token válido, mas sem o campo 'sub' (email)
     token = jwt.encode(
         {'outro_campo': 'valor'}, SECRET_KEY, algorithm=ALGORITHM
     )
 
     with pytest.raises(HTTPException) as exc:
-        await get_current_user(token=token, db=session)
+        await get_current_user(token=token, db=db_session)
 
     assert exc.value.status_code == HTTPStatus.UNAUTHORIZED
     assert exc.value.detail == 'Not authenticated'
 
 
 @pytest.mark.asyncio
-async def test_get_current_user_usuario_nao_encontrado(session):
+async def test_get_current_user_usuario_nao_encontrado(db_session):
     # Testa um token com e-mail que não existe no banco de dados
     # Isso cobre o 'if user is None'
     token = create_access_token(data={'sub': 'naoexiste@test.com'})
 
     with pytest.raises(HTTPException) as exc:
-        await get_current_user(token=token, db=session)
+        await get_current_user(token=token, db=db_session)
 
     assert exc.value.status_code == HTTPStatus.UNAUTHORIZED
     assert exc.value.detail == 'Not authenticated'
@@ -143,11 +149,12 @@ def test_verify_password_exception():
 
 # GET_CURRENT_USER
 # teste get_current user não encontrado
-def test_get_current_user_not_found(client):
+@pytest.mark.asyncio
+async def test_get_current_user_not_found(client):
     data = {'no-email': 'test'}
     token = create_access_token(data)
 
-    response = client.delete(
+    response = await client.delete(
         '/users/1',
         headers={'Authorization': f'Bearer {token}'},
     )
@@ -156,11 +163,12 @@ def test_get_current_user_not_found(client):
     assert response.json() == {'detail': 'Not authenticated'}
 
 
-def test_get_current_user_does_not_exists(client):
+@pytest.mark.asyncio
+async def test_get_current_user_does_not_exists(client):
     data = {'sub': 'test@test'}
     token = create_access_token(data)
 
-    response = client.delete(
+    response = await client.delete(
         '/users/1',
         headers={'Authorization': f'Bearer {token}'},
     )

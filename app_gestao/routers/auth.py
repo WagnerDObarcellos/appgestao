@@ -7,7 +7,7 @@ from sqlalchemy import select  # type: ignore
 from sqlalchemy.ext.asyncio import AsyncSession  # type: ignore
 
 from app_gestao.database import get_session
-from app_gestao.models import User
+from app_gestao.models.user import User
 from app_gestao.schemas import Token
 from app_gestao.security import (
     create_access_token,

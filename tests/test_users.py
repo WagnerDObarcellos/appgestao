@@ -1,14 +1,17 @@
 from http import HTTPStatus
 
+import pytest  # type: ignore
+
 from app_gestao.schemas import UserPublic
 from app_gestao.security import create_access_token
 
 
 # CREATE USER TESTS
 # test create user sucesso
-def test_create_user_deve_criar_usuario(client):
+@pytest.mark.asyncio
+async def test_create_user_deve_criar_usuario(client):
 
-    response = client.post(
+    response = await client.post(
         '/users/',
         json={
             'username': 'alice',
@@ -26,8 +29,9 @@ def test_create_user_deve_criar_usuario(client):
 
 
 # test create user email duplicado
-def test_create_user_email_duplicado(client, user):
-    response = client.post(
+@pytest.mark.asyncio
+async def test_create_user_email_duplicado(client, user):
+    response = await client.post(
         '/users/',
         json={
             'username': 'outro',
@@ -40,8 +44,9 @@ def test_create_user_email_duplicado(client, user):
 
 
 # test create user username duplicado
-def test_create_user_username_duplicado(client, user):
-    response = client.post(
+@pytest.mark.asyncio
+async def test_create_user_username_duplicado(client, user):
+    response = await client.post(
         '/users/',
         json={
             'username': user.username,
@@ -55,13 +60,14 @@ def test_create_user_username_duplicado(client, user):
 
 # READ USERS TESTS
 # test read users deve retornar lista de usuarios
-def test_read_users_deve_retornar_lista_de_usuarios(
-    client, admin_user, token, session
+@pytest.mark.asyncio
+async def test_read_users_deve_retornar_lista_de_usuarios(
+    client, admin_user, token, db_session
 ):
     user_schema = UserPublic.model_validate(admin_user).model_dump()
-    session.expire_all()
-    response = client.get(
-        '/users',
+    db_session.expire_all()
+    response = await client.get(
+        '/users/',
         headers={'Authorization': f'Bearer {token}'},
     )
     if response.status_code == HTTPStatus.FORBIDDEN:
@@ -73,10 +79,11 @@ def test_read_users_deve_retornar_lista_de_usuarios(
 
 
 # test read users com query params
-def test_read_users_with_query_params(client, admin_user):
+@pytest.mark.asyncio
+async def test_read_users_with_query_params(client, admin_user):
     token = create_access_token(data={'sub': admin_user.email})
-    response = client.get(
-        '/users?skip=0&limit=1',
+    response = await client.get(
+        '/users/?skip=0&limit=1',
         headers={'Authorization': f'Bearer {token}'},
     )
     assert response.status_code == HTTPStatus.OK
@@ -84,8 +91,9 @@ def test_read_users_with_query_params(client, admin_user):
 
 # UPDATE USER TESTS
 # test update user sucesso
-def test_update_user_sucesso(client, user, token):
-    response = client.put(
+@pytest.mark.asyncio
+async def test_update_user_sucesso(client, user, token):
+    response = await client.put(
         f'/users/{user.id}',
         headers={'Authorization': f'Bearer {token}'},
         json={
@@ -103,9 +111,10 @@ def test_update_user_sucesso(client, user, token):
 
 
 # test update user conflito email duplicado
-def test_update_user_retorar_conflito(client, user, token):
+@pytest.mark.asyncio
+async def test_update_user_retorar_conflito(client, user, token):
     # Criando um registro para "fausto"
-    client.post(
+    await client.post(
         '/users/',
         json={
             'username': 'fausto',
@@ -113,7 +122,7 @@ def test_update_user_retorar_conflito(client, user, token):
             'password': 'secret',
         },
     )
-    response_update = client.put(
+    response_update = await client.put(
         f'/users/{user.id}',
         headers={'Authorization': f'Bearer {token}'},
         json={
@@ -129,8 +138,9 @@ def test_update_user_retorar_conflito(client, user, token):
 
 
 # test update user inexistente
-def test_update_user_inexistente(client, token):
-    response = client.put(
+@pytest.mark.asyncio
+async def test_update_user_inexistente(client, token):
+    response = await client.put(
         '/users/999',
         headers={'Authorization': f'Bearer {token}'},
         json={
@@ -144,8 +154,9 @@ def test_update_user_inexistente(client, token):
 
 
 # test update user sem token
-def test_update_user_sem_token(client, user):
-    response = client.put(
+@pytest.mark.asyncio
+async def test_update_user_sem_token(client, user):
+    response = await client.put(
         f'/users/{user.id}',
         json={
             'username': 'x',
@@ -158,9 +169,10 @@ def test_update_user_sem_token(client, user):
     assert response.json() == {'detail': 'Not authenticated'}
 
 
-def test_update_user_forbidden(client, other_user, token):
+@pytest.mark.asyncio
+async def test_update_user_forbidden(client, other_user, token):
     # Testa erro 403 ao tentar atualizar outro usuário.
-    response = client.put(
+    response = await client.put(
         f'/users/{other_user.id}',
         headers={'Authorization': f'Bearer {token}'},
         json={
@@ -175,8 +187,9 @@ def test_update_user_forbidden(client, other_user, token):
 
 # DELETE USER TESTS
 # test delete user sucesso
-def test_delete_user(client, user, token):
-    response = client.delete(
+@pytest.mark.asyncio
+async def test_delete_user(client, user, token):
+    response = await client.delete(
         f'/users/{user.id}',
         headers={'Authorization': f'Bearer {token}'},
     )
@@ -186,8 +199,9 @@ def test_delete_user(client, user, token):
 
 
 # test delete user inexistente
-def test_delete_user_inexistente(client, token):
-    response = client.delete(
+@pytest.mark.asyncio
+async def test_delete_user_inexistente(client, token):
+    response = await client.delete(
         '/users/999',
         headers={'Authorization': f'Bearer {token}'},
     )
@@ -196,9 +210,10 @@ def test_delete_user_inexistente(client, token):
 
 
 # test delete user forbidden
-def test_delete_user_forbidden(client, other_user, token):
+@pytest.mark.asyncio
+async def test_delete_user_forbidden(client, other_user, token):
     """Testa erro 403 ao tentar deletar outro usuário."""
-    response = client.delete(
+    response = await client.delete(
         f'/users/{other_user.id}',
         headers={'Authorization': f'Bearer {token}'},
     )

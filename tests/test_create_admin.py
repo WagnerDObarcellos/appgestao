@@ -8,13 +8,13 @@ from app_gestao.scripts import create_admin
 
 
 @pytest.mark.asyncio
-async def test_create_first_admin_com_sessao_injetada(session):
+async def test_create_first_admin_com_sessao_injetada(db_session):
     """Cobre o caminho 'else' (quando a sessão é passada pelo teste)."""
-    await create_admin.create_first_admin(session)
+    await create_admin.create_first_admin(db_session)
 
     # Verifica se o admin foi persistido no banco de teste
     stmt = select(User).where(User.email == 'admin@admin.com')
-    result = await session.execute(stmt)
+    result = await db_session.execute(stmt)
     admin = result.scalars().first()
 
     assert admin is not None
@@ -40,11 +40,11 @@ async def test_create_first_admin_sem_sessao_injetada():
 
 
 @pytest.mark.asyncio
-async def test_logic_criacao_sucesso(session):
+async def test_logic_criacao_sucesso(db_session):
     """Cobre a função _logic e garante o commit."""
-    await create_admin._logic(session)
+    await create_admin._logic(db_session)
 
     stmt = select(User).where(User.username == 'admin')
-    user = await session.scalar(stmt)
+    user = await db_session.scalar(stmt)
     assert user is not None
     assert user.role == 'admin'

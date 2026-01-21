@@ -9,6 +9,7 @@ __pycache__/
 
 #project stuff
 database.db
+test.db
 
 # C extensions
 *.so
