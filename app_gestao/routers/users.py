@@ -6,7 +6,13 @@ from sqlalchemy import select  # type: ignore
 from sqlalchemy.exc import IntegrityError  # type: ignore
 from sqlalchemy.ext.asyncio import AsyncSession  # type: ignore
 
-from app_gestao.database import get_session
+# Módulos locais organizados alfabeticamente pelo nome do submódulo
+from app_gestao.core.security import (
+    get_current_admin_user,
+    get_current_user,
+    get_password_hash,
+)
+from app_gestao.db.database import get_session
 from app_gestao.models import User
 from app_gestao.schemas import (
     FilterPage,
@@ -15,13 +21,9 @@ from app_gestao.schemas import (
     UserPublic,
     UserUpdate,
 )
-from app_gestao.security import (
-    get_current_admin_user,
-    get_current_user,
-    get_password_hash,
-)
 
 SessionDep: TypeAlias = Annotated[AsyncSession, Depends(get_session)]
+
 
 router = APIRouter(prefix='/users', tags=['users'])
 

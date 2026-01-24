@@ -5,7 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query  # type: ignore
 from sqlalchemy import select  # type: ignore
 from sqlalchemy.ext.asyncio import AsyncSession  # type: ignore
 
-from app_gestao.database import get_session
+from app_gestao.core.security import get_current_user
+from app_gestao.db.database import get_session
 from app_gestao.models import Todo, User
 from app_gestao.schemas import (
     FilterTodo,
@@ -15,9 +16,6 @@ from app_gestao.schemas import (
     TodoSchema,
     TodoUpdate,
 )
-from app_gestao.security import get_current_user
-
-router = APIRouter()
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
@@ -25,7 +23,11 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 router = APIRouter(prefix='/todos', tags=['todos'])
 
 
-@router.post('/', response_model=TodoPublic)
+@router.post(
+    '/',
+    response_model=TodoPublic,
+    status_code=HTTPStatus.CREATED,
+)
 async def create_todo(
     todo: TodoSchema,
     user: CurrentUser,

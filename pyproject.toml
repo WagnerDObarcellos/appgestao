@@ -15,7 +15,9 @@ dependencies = [
     "pwdlib[argon2] (>=0.3.0,<0.4.0)",
     "pyjwt (>=2.10.1,<3.0.0)",
     "python-jose (>=3.5.0,<4.0.0)",
-    "aiosqlite (>=0.22.1,<0.23.0)"
+    "aiosqlite (>=0.22.1,<0.23.0)",
+    "passlib[bcrypt] (>=1.7.4,<2.0.0)",
+    "bcrypt (==4.0.1)"
 ]
 
 
@@ -57,7 +59,7 @@ asyncio_mode = 'auto'
 lint = 'ruff check'
 pre_format = 'ruff check --fix'
 format = 'ruff format'
-run = 'fastapi dev app_gestao/app.py'
+run = 'fastapi dev app_gestao/main/app.py'
 pre_test = 'task lint'
 test = 'pytest -s -x --cov=app_gestao --maxfail=1 -s --asyncio-mode=auto -vv'
 post_test = 'coverage html'
@@ -65,3 +67,6 @@ post_test = 'coverage html'
 [tool.coverage.run]
 core = "ctrace"
 concurrency = ["thread", "greenlet"]
+
+[tool.poetry.scripts]
+dev = "uvicorn app_gestao.main.app:app --reload"

@@ -6,8 +6,10 @@ from sqlalchemy.ext.asyncio import async_engine_from_config # type: ignore
 from sqlalchemy import pool # type: ignore
 
 from alembic import context # type: ignore
-from app_gestao.settings import Settings
-from app_gestao.models import table_registry
+from app_gestao.db.database import Base
+from app_gestao.models import *  # noqa: F401,F403
+from app_gestao.core.settings import Settings
+
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -24,7 +26,7 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-target_metadata = table_registry.metadata
+target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

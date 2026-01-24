@@ -2,7 +2,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field  # type: ignore
 
-from app_gestao.models import TodoState
+from app_gestao.models.todo import TodoState
 
 from .common import FilterPage
 

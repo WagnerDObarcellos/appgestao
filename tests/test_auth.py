@@ -4,6 +4,8 @@ from unittest.mock import patch
 import pytest  # type: ignore
 from freezegun import freeze_time  # type: ignore
 
+from app_gestao.core.security import create_access_token
+
 
 @pytest.mark.asyncio
 async def test_token_expired_after_time(client, user):
@@ -21,7 +23,7 @@ async def test_token_expired_after_time(client, user):
         token = response.json()['access_token']
 
     # 3. Avançamos o tempo para invalidar o token gerado acima.
-    with freeze_time('2026-01-20 12:31:00'):
+    with freeze_time('2026-01-27 12:31:00'):
         response = await client.put(
             f'/users/{user.id}',
             headers={'Authorization': f'Bearer {token}'},
@@ -33,7 +35,7 @@ async def test_token_expired_after_time(client, user):
         )
         assert response.status_code == HTTPStatus.UNAUTHORIZED
         # Verifique se o detail é exatamente este:
-        assert response.json()['detail'] == 'Not authenticated'
+        assert response.json()['detail'] == 'Could not validate credentials'
 
 
 # TOKEN TESTS
@@ -162,10 +164,13 @@ async def test_not_verify_password(client, user):
 
 
 @pytest.mark.asyncio
-async def test_refresh_token(client, user, token):
+async def test_refresh_token(client, user, user_token):
+    refresh_token = create_access_token(
+        data={'sub': str(user.id), 'role': 'user'},
+    )
     response = await client.post(
         '/auth/refresh_token',
-        headers={'Authorization': f'Bearer {token}'},
+        json={'refresh_token': refresh_token},
     )
 
     data = response.json()
@@ -187,13 +192,15 @@ async def test_token_expired_dont_refresh(client, user):
             },
         )
         assert response.status_code == HTTPStatus.OK
-        token = response.json()['access_token']
+        refresh_token = response.json()['refresh_token']
 
-    with freeze_time('2023-01-14 12:31:00'):
+    with freeze_time('2023-01-21 12:31:00'):
         response = await client.post(
             '/auth/refresh_token',
-            headers={'Authorization': f'Bearer {token}'},
+            json={'refresh_token': refresh_token},
         )
 
         assert response.status_code == HTTPStatus.UNAUTHORIZED
-        assert response.json() == {'detail': 'Not authenticated'}
+        assert response.json() == {
+            'detail': 'Invalid or expired refresh token'
+        }

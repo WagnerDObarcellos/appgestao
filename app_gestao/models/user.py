@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import String, func  # type: ignore
 from sqlalchemy.orm import Mapped, mapped_column, relationship  # type: ignore
 
-from app_gestao.database import Base
+from app_gestao.db.database import Base
 
 if TYPE_CHECKING:
     from app_gestao.models.todo import Todo

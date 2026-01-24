@@ -1,13 +1,12 @@
+from http import HTTPStatus
 from typing import Annotated, List
 
-from fastapi import APIRouter, Depends, HTTPException, status  # type: ignore
+from fastapi import APIRouter, Depends, HTTPException  # type: ignore
 from sqlalchemy import select  # type: ignore
 from sqlalchemy.ext.asyncio import AsyncSession  # type: ignore
 
 from app_gestao.core.security import AdminPermission
-
-# Importes fictícios baseados no seu projeto
-from app_gestao.database import get_session
+from app_gestao.db.database import get_session
 from app_gestao.models.task import Task
 from app_gestao.schemas.task import TaskCreate, TaskSchema, TaskUpdate
 
@@ -17,9 +16,7 @@ router = APIRouter(prefix='/tasks', tags=['Tasks'])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
-@router.post(
-    '/', response_model=TaskSchema, status_code=status.HTTP_201_CREATED
-)
+@router.post('/', response_model=TaskSchema, status_code=HTTPStatus.CREATED)
 async def create_task(task_data: TaskCreate, db: SessionDep):  # type: ignore
     """
     Cria uma nova task.
@@ -48,12 +45,15 @@ async def get_task(task_id: int, db: SessionDep):  # type: ignore
     return task
 
 
-@router.patch('/{task_id}', response_model=TaskSchema)
+@router.patch(
+    '/{task_id}',
+    response_model=TaskSchema,
+)
 async def update_task(
     task_id: int,
     task_update: TaskUpdate,
     db: SessionDep,  # type: ignore
-    is_admin_user: AdminPermission,  # Nome do parâmetro definido aqui
+    is_admin_user: Annotated[bool, Depends(AdminPermission)],
 ):
     """
     Atualiza dados de uma task.
@@ -62,7 +62,7 @@ async def update_task(
     task = await db.get(Task, task_id)
     if not task:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail='Task não encontrada'
+            status_code=HTTPStatus.NOT_FOUND, detail='Task não encontrada'
         )
 
     update_data = task_update.model_dump(exclude_unset=True)
@@ -70,7 +70,7 @@ async def update_task(
     # O nome aqui deve bater com o parâmetro da função: is_admin_user
     if 'assigned_to' in update_data and not is_admin_user:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=HTTPStatus.FORBIDDEN,
             detail='Permissão negada: apenas administradores podem '
             'atribuir ou alterar o responsável pela tarefa.',
         )
@@ -83,12 +83,14 @@ async def update_task(
     return task
 
 
-@router.delete('/{task_id}', status_code=status.HTTP_204_NO_CONTENT)
+@router.delete('/{task_id}', status_code=HTTPStatus.NO_CONTENT)
 async def delete_task(task_id: int, db: SessionDep):  # type: ignore
     """Remove uma task do sistema."""
     task = await db.get(Task, task_id)
     if not task:
-        raise HTTPException(status_code=404, detail='Task não encontrada')
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail='Task não encontrada'
+        )
 
     await db.delete(task)
     await db.commit()

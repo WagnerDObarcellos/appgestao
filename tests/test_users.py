@@ -2,8 +2,8 @@ from http import HTTPStatus
 
 import pytest  # type: ignore
 
+from app_gestao.core.security import create_access_token
 from app_gestao.schemas import UserPublic
-from app_gestao.security import create_access_token
 
 
 # CREATE USER TESTS
@@ -62,17 +62,31 @@ async def test_create_user_username_duplicado(client, user):
 # test read users deve retornar lista de usuarios
 @pytest.mark.asyncio
 async def test_read_users_deve_retornar_lista_de_usuarios(
-    client, admin_user, token, db_session
+    client, admin_user, db_session
 ):
+
+    await db_session.commit()
+    await db_session.refresh(admin_user)
+
+    login_response = await client.post(
+        '/auth/token',
+        data={
+            'username': admin_user.email,
+            'password': admin_user.clean_password,
+        },
+    )
+
+    assert login_response.status_code == HTTPStatus.OK
+    token = login_response.json()['access_token']
+
     user_schema = UserPublic.model_validate(admin_user).model_dump()
+
     db_session.expire_all()
+
     response = await client.get(
         '/users/',
         headers={'Authorization': f'Bearer {token}'},
     )
-    if response.status_code == HTTPStatus.FORBIDDEN:
-        print(f'DEBUG: Token usado para o email: {admin_user.email}')
-        print(f'DEBUG: Resposta da API: {response.json()}')
 
     assert response.status_code == HTTPStatus.OK
     assert response.json() == {'users': [user_schema]}
@@ -80,8 +94,9 @@ async def test_read_users_deve_retornar_lista_de_usuarios(
 
 # test read users com query params
 @pytest.mark.asyncio
-async def test_read_users_with_query_params(client, admin_user):
-    token = create_access_token(data={'sub': admin_user.email})
+async def test_read_users_with_query_params(client, admin_user, db_session):
+    await db_session.commit()
+    token = create_access_token(data={'sub': str(admin_user.id)})
     response = await client.get(
         '/users/?skip=0&limit=1',
         headers={'Authorization': f'Bearer {token}'},
@@ -92,10 +107,10 @@ async def test_read_users_with_query_params(client, admin_user):
 # UPDATE USER TESTS
 # test update user sucesso
 @pytest.mark.asyncio
-async def test_update_user_sucesso(client, user, token):
+async def test_update_user_sucesso(client, user, user_token):
     response = await client.put(
         f'/users/{user.id}',
-        headers={'Authorization': f'Bearer {token}'},
+        headers={'Authorization': f'Bearer {user_token}'},
         json={
             'username': 'bob',
             'email': 'bob@example.com',
@@ -112,7 +127,7 @@ async def test_update_user_sucesso(client, user, token):
 
 # test update user conflito email duplicado
 @pytest.mark.asyncio
-async def test_update_user_retorar_conflito(client, user, token):
+async def test_update_user_retorar_conflito(client, user, user_token):
     # Criando um registro para "fausto"
     await client.post(
         '/users/',
@@ -124,7 +139,7 @@ async def test_update_user_retorar_conflito(client, user, token):
     )
     response_update = await client.put(
         f'/users/{user.id}',
-        headers={'Authorization': f'Bearer {token}'},
+        headers={'Authorization': f'Bearer {user_token}'},
         json={
             'username': 'fausto',
             'email': 'bob@example.com',
@@ -139,10 +154,10 @@ async def test_update_user_retorar_conflito(client, user, token):
 
 # test update user inexistente
 @pytest.mark.asyncio
-async def test_update_user_inexistente(client, token):
+async def test_update_user_inexistente(client, user_token):
     response = await client.put(
         '/users/999',
-        headers={'Authorization': f'Bearer {token}'},
+        headers={'Authorization': f'Bearer {user_token}'},
         json={
             'username': 'x',
             'email': 'x@x.com',
@@ -170,11 +185,11 @@ async def test_update_user_sem_token(client, user):
 
 
 @pytest.mark.asyncio
-async def test_update_user_forbidden(client, other_user, token):
+async def test_update_user_forbidden(client, other_user, user_token):
     # Testa erro 403 ao tentar atualizar outro usuário.
     response = await client.put(
         f'/users/{other_user.id}',
-        headers={'Authorization': f'Bearer {token}'},
+        headers={'Authorization': f'Bearer {user_token}'},
         json={
             'username': 'novo_nome',
             'email': 'novo_email@example.com',
@@ -188,10 +203,10 @@ async def test_update_user_forbidden(client, other_user, token):
 # DELETE USER TESTS
 # test delete user sucesso
 @pytest.mark.asyncio
-async def test_delete_user(client, user, token):
+async def test_delete_user(client, user, user_token):
     response = await client.delete(
         f'/users/{user.id}',
-        headers={'Authorization': f'Bearer {token}'},
+        headers={'Authorization': f'Bearer {user_token}'},
     )
 
     assert response.status_code == HTTPStatus.NO_CONTENT
@@ -200,10 +215,10 @@ async def test_delete_user(client, user, token):
 
 # test delete user inexistente
 @pytest.mark.asyncio
-async def test_delete_user_inexistente(client, token):
+async def test_delete_user_inexistente(client, user_token):
     response = await client.delete(
         '/users/999',
-        headers={'Authorization': f'Bearer {token}'},
+        headers={'Authorization': f'Bearer {user_token}'},
     )
     assert response.status_code == HTTPStatus.NOT_FOUND
     assert response.json() == {'detail': 'User not found'}
@@ -211,11 +226,11 @@ async def test_delete_user_inexistente(client, token):
 
 # test delete user forbidden
 @pytest.mark.asyncio
-async def test_delete_user_forbidden(client, other_user, token):
+async def test_delete_user_forbidden(client, other_user, user_token):
     """Testa erro 403 ao tentar deletar outro usuário."""
     response = await client.delete(
         f'/users/{other_user.id}',
-        headers={'Authorization': f'Bearer {token}'},
+        headers={'Authorization': f'Bearer {user_token}'},
     )
     assert response.status_code == HTTPStatus.FORBIDDEN
     assert response.json() == {'detail': 'Not enough permissions'}

@@ -8,15 +8,15 @@ from fastapi import Depends, HTTPException  # type: ignore
 from jose import jwt  # type: ignore
 from jwt import decode  # type: ignore
 
-from app_gestao.models import User
-from app_gestao.security import (
+from app_gestao.core.security import (
     ALGORITHM,
     SECRET_KEY,
     create_access_token,
     get_current_user,
     verify_password,
 )
-from app_gestao.settings import Settings
+from app_gestao.core.settings import Settings
+from app_gestao.models.user import User
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
@@ -61,7 +61,7 @@ async def test_jwt_invalid_token(client):
     )
 
     assert response.status_code == HTTPStatus.UNAUTHORIZED
-    assert response.json() == {'detail': 'Not authenticated'}
+    assert response.json() == {'detail': 'Could not validate credentials'}
 
 
 @pytest.mark.asyncio
@@ -70,14 +70,14 @@ async def test_get_current_user_sucesso(db_session, user):
 
     await db_session.commit()
 
-    token = create_access_token(data={'sub': user.email})
-    returned_user = await get_current_user(token=token, db=db_session)
+    token = create_access_token(data={'sub': str(user.id)})
+    returned_user = await get_current_user(token=token, db_session=db_session)
 
     assert returned_user.email == user.email
     assert returned_user.id == user.id
 
 
-def get_current_admin_user(
+async def get_current_admin_user(
     current_user: CurrentUser,
 ):
     if current_user.role != 'admin':
@@ -92,10 +92,10 @@ def get_current_admin_user(
 async def test_get_current_user_token_vazio(db_session):
     # Testa o 'if not token'
     with pytest.raises(HTTPException) as exc:
-        await get_current_user(token='', db=db_session)
+        await get_current_user(token='', db_session=db_session)
 
     assert exc.value.status_code == HTTPStatus.UNAUTHORIZED
-    assert exc.value.detail == 'Not authenticated'
+    assert exc.value.detail == 'Could not validate credentials'
 
 
 @pytest.mark.asyncio
@@ -103,11 +103,11 @@ async def test_get_current_user_token_invalido(db_session):
     # Testa o bloco 'except JWTError'
     with pytest.raises(HTTPException) as exc:
         await get_current_user(
-            token='token-totalmente-invalido', db=db_session
+            token='token-totalmente-invalido', db_session=db_session
         )
 
     assert exc.value.status_code == HTTPStatus.UNAUTHORIZED
-    assert exc.value.detail == 'Not authenticated'
+    assert exc.value.detail == 'Could not validate credentials'
 
 
 @pytest.mark.asyncio
@@ -118,33 +118,35 @@ async def test_get_current_user_payload_sem_email(db_session):
     )
 
     with pytest.raises(HTTPException) as exc:
-        await get_current_user(token=token, db=db_session)
+        await get_current_user(token=token, db_session=db_session)
 
     assert exc.value.status_code == HTTPStatus.UNAUTHORIZED
-    assert exc.value.detail == 'Not authenticated'
+    assert exc.value.detail == 'Could not validate credentials'
 
 
 @pytest.mark.asyncio
 async def test_get_current_user_usuario_nao_encontrado(db_session):
     # Testa um token com e-mail que não existe no banco de dados
     # Isso cobre o 'if user is None'
-    token = create_access_token(data={'sub': 'naoexiste@test.com'})
+    token = create_access_token(data={'sub': '99999'})
 
     with pytest.raises(HTTPException) as exc:
-        await get_current_user(token=token, db=db_session)
+        await get_current_user(token=token, db_session=db_session)
 
     assert exc.value.status_code == HTTPStatus.UNAUTHORIZED
-    assert exc.value.detail == 'Not authenticated'
+    assert exc.value.detail == 'Could not validate credentials'
 
 
+# VERIFY_PASSWORD
 def test_verify_password_exception():
     with patch(
-        'app_gestao.security.pwd_context.verify',
+        'app_gestao.core.security.pwd_context.verify',
         side_effect=Exception('Erro interno'),
     ):
-        result = verify_password('senha', 'hash_invalido')
+        with pytest.raises(Exception, match='Erro interno'):
+            verify_password('senha', 'hash_invalido')
 
-    assert result is False
+    assert True
 
 
 # GET_CURRENT_USER
@@ -160,12 +162,12 @@ async def test_get_current_user_not_found(client):
     )
 
     assert response.status_code == HTTPStatus.UNAUTHORIZED
-    assert response.json() == {'detail': 'Not authenticated'}
+    assert response.json() == {'detail': 'Could not validate credentials'}
 
 
 @pytest.mark.asyncio
 async def test_get_current_user_does_not_exists(client):
-    data = {'sub': 'test@test'}
+    data = {'sub': '99999'}
     token = create_access_token(data)
 
     response = await client.delete(
@@ -174,7 +176,7 @@ async def test_get_current_user_does_not_exists(client):
     )
 
     assert response.status_code == HTTPStatus.UNAUTHORIZED
-    assert response.json() == {'detail': 'Not authenticated'}
+    assert response.json() == {'detail': 'Could not validate credentials'}
 
 
 @pytest.mark.asyncio
@@ -193,5 +195,17 @@ async def test_get_current_admin_user_forbidden(user):
 async def test_get_current_admin_user_success(user):
     # Testa o retorno de sucesso para admin
     user.role = 'admin'
-    result = get_current_admin_user(current_user=user)
+    result = await get_current_admin_user(current_user=user)
     assert result.role == 'admin'
+
+
+@pytest.mark.asyncio
+async def test_get_current_user_token_sem_sub(db_session):
+    # Criamos um token válido, mas sem a chave 'sub'
+    token = create_access_token(data={'some_other_key': 'no_email'})
+
+    with pytest.raises(HTTPException) as exc:
+        await get_current_user(token=token, db_session=db_session)
+
+    assert exc.value.status_code == HTTPStatus.UNAUTHORIZED
+    assert exc.value.detail == 'Could not validate credentials'

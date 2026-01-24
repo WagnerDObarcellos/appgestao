@@ -6,20 +6,21 @@ from fastapi.security import OAuth2PasswordRequestForm  # type: ignore
 from sqlalchemy import select  # type: ignore
 from sqlalchemy.ext.asyncio import AsyncSession  # type: ignore
 
-from app_gestao.database import get_session
-from app_gestao.models.user import User
-from app_gestao.schemas import Token
-from app_gestao.security import (
+from app_gestao.core.security import (
     create_access_token,
+    create_refresh_token,
+    decode_refresh_token,
     get_current_user,
     verify_password,
 )
+from app_gestao.db.database import get_session
+from app_gestao.models.user import User
+from app_gestao.schemas.auth import RefreshToken, Token
 
-router = APIRouter(prefix='/auth', tags=['auth'])  # pragma: no cover
+router = APIRouter(prefix='/auth', tags=['auth'])
 
 OAuth2Form = Annotated[OAuth2PasswordRequestForm, Depends()]
-# pragma: no cover
-SessionDep = Annotated[AsyncSession, Depends(get_session)]  # pragma: no cover
+SessionDep = Annotated[AsyncSession, Depends(get_session)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
@@ -52,16 +53,49 @@ async def login_for_access_token(form_data: OAuth2Form, session: SessionDep):  #
             detail='Incorrect email or password',
         )
 
-    access_token = create_access_token(data={'sub': user.email})
+    # REMOVIDO 'await': create_access_token é síncrona
+    access_token = create_access_token(
+        data={
+            'sub': str(user.id),
+            'role': user.role,
+        }
+    )
+
+    # REMOVIDO 'await': create_refresh_token é síncrona
+    refresh_token = create_refresh_token(
+        data={
+            'sub': str(user.id),
+            'role': user.role,  # Adicionado role para consistência no refresh
+        }
+    )
 
     return {
         'access_token': access_token,
+        'refresh_token': refresh_token,
         'token_type': 'bearer',
     }
 
 
 @router.post('/refresh_token', response_model=Token)
-async def refresh_access_token(user: CurrentUser):
-    new_access_token = create_access_token(data={'sub': user.email})
+async def refresh_access_token(payload: RefreshToken):
+    data = decode_refresh_token(payload.refresh_token)
 
-    return {'access_token': new_access_token, 'token_type': 'bearer'}
+    if not data:
+        raise HTTPException(
+            status_code=HTTPStatus.UNAUTHORIZED,
+            detail='Invalid or expired refresh token',
+        )
+
+    user_id = data.get('sub')
+    user_role = data.get('role', 'user')
+
+    # REMOVIDO 'await': create_access_token é síncrona
+    access_token = create_access_token(
+        data={'sub': str(user_id), 'role': user_role}
+    )
+
+    return {
+        'access_token': access_token,
+        'refresh_token': payload.refresh_token,
+        'token_type': 'bearer',
+    }

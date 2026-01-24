@@ -7,7 +7,7 @@ from sqlalchemy.orm import (  # type: ignore
     mapped_column,
 )
 
-from app_gestao.database import Base
+from app_gestao.db.database import Base
 
 
 class Task(Base):
