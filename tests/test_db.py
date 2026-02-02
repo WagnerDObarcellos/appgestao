@@ -19,6 +19,8 @@ async def test_create_user(db_session, mock_db_time):
     assert user.email == 'test@example.com'
     assert user.role == 'user'
     assert user.created_at == time
+    assert user.updated_at == time
+    assert user.todos == []
 
     assert user.id is not None
 

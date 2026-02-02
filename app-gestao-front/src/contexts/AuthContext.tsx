@@ -1,52 +1,79 @@
-import { createContext, useContext, useState, type ReactNode } from "react"
-import api from "../api/client"
+import { createContext, useContext, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 type User = {
-  email: string
-}
+  email: string;
+  role: "user" | "admin";
+};
 
-type AuthContextData = {
-  user: User | null
-  token: string | null
-  signIn: (email: string, password: string) => Promise<void>
-  signOut: () => void
-}
+type AuthContextType = {
+  user: User | null;
+  token: string | null;
+  signIn: (token: string, user: User) => void;
+  signOut: () => void;
+  isAuthenticated: boolean;
+};
 
-const AuthContext = createContext<AuthContextData>({} as AuthContextData)
+const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [token, setToken] = useState<string | null>(null)
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
-  async function signIn(email: string, password: string) {
-    const data = new URLSearchParams()
-    data.append("username", email) // OAuth2 espera "username"
-    data.append("password", password)
+  // 1. useEffect movido para o escopo correto (fora das funções)
+  useEffect(() => {
+  const storedToken = localStorage.getItem("token");
+  const storedUser = localStorage.getItem("user");
 
-    const response = await api.post("/auth/token", data, {
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-    })
+  if (storedToken && storedUser && storedUser !== "undefined") {
+    try {
+      setToken(storedToken);
+      setUser(JSON.parse(storedUser));
+    } catch {
+      localStorage.clear();
+    }
+  }
 
-    const { access_token } = response.data
+  setLoading(false);
+}, []);
 
-    setToken(access_token)
-    setUser({ email })
+
+  // 2. Apenas UMA declaração da função signIn
+  function signIn(receivedToken: string, receivedUser: User) {
+    if (!receivedToken || !receivedUser) {
+      throw new Error("Dados de autenticação inválidos");
+    }
+
+    localStorage.setItem("token", receivedToken);
+    localStorage.setItem("user", JSON.stringify(receivedUser));
+
+    setToken(receivedToken);
+    setUser(receivedUser);
+
+    navigate("/dashboard");
   }
 
   function signOut() {
-    setUser(null)
-    setToken(null)
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    setToken(null);
+    setUser(null);
+    navigate("/");
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, signIn, signOut }}>
-      {children}
+    <AuthContext.Provider value={{ 
+      user, 
+      token, 
+      signIn, 
+      signOut, 
+      isAuthenticated: !!token 
+    }}>
+      {!loading && children}
     </AuthContext.Provider>
-  )
+  );
 }
 
-export function useAuth() {
-  return useContext(AuthContext)
-}
+export const useAuth = () => useContext(AuthContext);

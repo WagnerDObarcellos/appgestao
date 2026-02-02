@@ -1,6 +1,6 @@
 # app_gestao/models/__init__.py
 from .task import Task
-from .todo import Todo, TodoState
+from .todos import Todo, TodoState
 from .user import (
     User,  # Ajuste '.user' para o nome real do arquivo (ex: .usuarios)
 )

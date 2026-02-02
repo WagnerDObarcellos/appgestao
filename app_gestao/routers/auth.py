@@ -15,7 +15,7 @@ from app_gestao.core.security import (
 )
 from app_gestao.db.database import get_session
 from app_gestao.models.user import User
-from app_gestao.schemas.auth import RefreshToken, Token
+from app_gestao.schemas.auth import RefreshToken, Token, TokenRefresh
 
 router = APIRouter(prefix='/auth', tags=['auth'])
 
@@ -35,6 +35,8 @@ async def login_for_access_token(form_data: OAuth2Form, session: SessionDep):  #
             status_code=HTTPStatus.UNAUTHORIZED,
             detail='Incorrect email or password',
         )
+
+    password_valid = verify_password(form_data.password, user.password)
 
     try:
         password_valid = verify_password(
@@ -73,10 +75,16 @@ async def login_for_access_token(form_data: OAuth2Form, session: SessionDep):  #
         'access_token': access_token,
         'refresh_token': refresh_token,
         'token_type': 'bearer',
+        'user': {
+            'id': user.id,
+            'email': user.email,
+            'username': user.email,
+            'role': user.role,
+        },
     }
 
 
-@router.post('/refresh_token', response_model=Token)
+@router.post('/refresh_token', response_model=TokenRefresh)
 async def refresh_access_token(payload: RefreshToken):
     data = decode_refresh_token(payload.refresh_token)
 

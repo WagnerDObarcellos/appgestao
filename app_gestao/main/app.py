@@ -6,11 +6,12 @@ from fastapi.middleware.cors import CORSMiddleware  # type: ignore
 from app_gestao.routers import auth, task, todos, users
 from app_gestao.schemas.common import Message
 
-app = FastAPI()
+app = FastAPI(title='Meu API')
+
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['http://localhost:5173'],
+    allow_origins='http://localhost:5173',
     allow_credentials=True,
     allow_methods=['*'],
     allow_headers=['*'],

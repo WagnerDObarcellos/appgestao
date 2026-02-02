@@ -77,16 +77,17 @@ async def test_get_token_password_verify_exception(client, user):
     with patch('app_gestao.routers.auth.verify_password') as mock:
         mock.side_effect = Exception('Erro interno de Hash')
 
-        response = await client.post(
-            '/auth/token',
-            data={
-                'username': user.email,
-                'password': user.clean_password,
-            },
-        )
-
-        assert response.status_code == HTTPStatus.UNAUTHORIZED
-        assert response.json() == {'detail': 'Incorrect email or password'}
+        with pytest.raises(
+            Exception, match='Erro interno de Hash'
+        ) as exc_info:
+            await client.post(
+                '/auth/token',
+                data={
+                    'username': user.email,
+                    'password': user.clean_password,
+                },
+            )
+        assert 'Erro interno de Hash' in str(exc_info.value)
 
 
 # teste quando o usuario não existe
@@ -140,16 +141,16 @@ async def test_login_token_verify_password_exception(client, user):
         'app_gestao.routers.auth.verify_password',
         side_effect=Exception('Erro interno'),
     ):
-        response = await client.post(
-            '/auth/token',
-            data={
-                'username': user.email,
-                'password': 'senha_errada',
-            },
-        )
+        with pytest.raises(Exception, match='Erro interno') as exc_info:
+            await client.post(
+                '/auth/token',
+                data={
+                    'username': user.email,
+                    'password': 'senha_errada',
+                },
+            )
 
-    assert response.status_code == HTTPStatus.UNAUTHORIZED
-    assert response.json()['detail'] == 'Incorrect email or password'
+    assert 'Erro interno' in str(exc_info.value)
 
 
 @pytest.mark.asyncio

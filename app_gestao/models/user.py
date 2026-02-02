@@ -7,7 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship  # type: ignore
 from app_gestao.db.database import Base
 
 if TYPE_CHECKING:
-    from app_gestao.models.todo import Todo
+    from app_gestao.models.todos import Todo
 
 
 class User(Base):

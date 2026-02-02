@@ -6,7 +6,7 @@ import pytest  # type: ignore
 
 from app_gestao.core.security import get_session
 from app_gestao.main.app import app
-from app_gestao.models.todo import Todo, TodoState
+from app_gestao.app_gestao.models.todos import Todo, TodoState
 
 
 class TodoFactory(factory.Factory):
